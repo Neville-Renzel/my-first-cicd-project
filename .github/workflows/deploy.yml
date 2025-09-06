@@ -57,7 +57,8 @@ jobs:
         run: npm run build
   
       - name: Check build output
-        run: echo "Build completed: ${{ steps.build.outcome }}"
+        run: |
+          echo "Build completed: ${{ steps.build.outcome }}"
 
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -132,7 +133,7 @@ jobs:
   # Add this job after build-and-performance
   performance-testing:
     name: 🏃‍♂️ Performance Testing
-    needs: [build-and-performance]
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

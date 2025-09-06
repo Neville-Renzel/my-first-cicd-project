@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CI/CD Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .metric {
+        display: inline-block;
+        margin: 10px;
+        text-align: center;
+      }
+      .metric-value {
+        font-size: 2em;
+        font-weight: bold;
+        color: #333;
+      }
+      .metric-label {
+        color: #666;
+      }
+      .status-green {
+        color: #4caf50;
+      }
+      .status-red {
+        color: #f44336;
+      }
+      .status-yellow {
+        color: #ff9800;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🚀 CI/CD Pipeline Dashboard</h1>
+
+      <!-- Real-time Status -->
+      <div class="card">
+        <h2>System Status</h2>
+        <div class="metric">
+          <div class="metric-value status-green" id="uptime">99.9%</div>
+          <div class="metric-label">Uptime</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" id="response-time">142ms</div>
+          <div class="metric-label">Avg Response Time</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value status-green" id="deployments">23</div>
+          <div class="metric-label">Deployments Today</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value status-green" id="success-rate">98%</div>
+          <div class="metric-label">Success Rate</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <!-- Deployment History -->
+        <div class="card">
+          <h3>Deployment History</h3>
+          <canvas id="deploymentChart"></canvas>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="card">
+          <h3>Performance Metrics</h3>
+          <canvas id="performanceChart"></canvas>
+        </div>
+
+        <!-- Error Rates -->
+        <div class="card">
+          <h3>Error Rates</h3>
+          <canvas id="errorChart"></canvas>
+        </div>
+
+        <!-- Build Times -->
+        <div class="card">
+          <h3>Build Times</h3>
+          <canvas id="buildChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="card">
+        <h3>Recent Activity</h3>
+        <div id="activity-log">
+          <p>✅ Production deployment completed - 2 minutes ago</p>
+          <p>🔍 Security scan passed - 5 minutes ago</p>
+          <p>🧪 All tests passed - 7 minutes ago</p>
+          <p>📊 Performance audit completed - 10 minutes ago</p>
+          <p>🚀 Staging deployment started - 15 minutes ago</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Deployment History Chart
+      const deploymentCtx = document
+        .getElementById('deploymentChart')
+        .getContext('2d')
+      new Chart(deploymentCtx, {
+        type: 'line',
+        data: {
+          labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          datasets: [
+            {
+              label: 'Deployments',
+              data: [12, 19, 3, 5, 8, 3, 7],
+              borderColor: '#4CAF50',
+              backgroundColor: 'rgba(76, 175, 80, 0.1)',
+              tension: 0.4,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+        },
+      })
+
+      // Performance Chart
+      const performanceCtx = document
+        .getElementById('performanceChart')
+        .getContext('2d')
+      new Chart(performanceCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Good', 'Needs Improvement', 'Poor'],
+          datasets: [
+            {
+              data: [85, 12, 3],
+              backgroundColor: ['#4CAF50', '#FF9800', '#F44336'],
+            },
+          ],
+        },
+        options: { responsive: true },
+      })
+
+      // Error Rates Chart
+      const errorCtx = document.getElementById('errorChart').getContext('2d')
+      new Chart(errorCtx, {
+        type: 'bar',
+        data: {
+          labels: ['4xx Errors', '5xx Errors', 'Timeouts'],
+          datasets: [
+            {
+              data: [2, 1, 0],
+              backgroundColor: ['#FF9800', '#F44336', '#9C27B0'],
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+        },
+      })
+
+      // Build Times Chart
+      const buildCtx = document.getElementById('buildChart').getContext('2d')
+      new Chart(buildCtx, {
+        type: 'line',
+        data: {
+          labels: ['Build 1', 'Build 2', 'Build 3', 'Build 4', 'Build 5'],
+          datasets: [
+            {
+              label: 'Build Time (minutes)',
+              data: [3.2, 2.8, 3.5, 2.9, 3.1],
+              borderColor: '#2196F3',
+              backgroundColor: 'rgba(33, 150, 243, 0.1)',
+              tension: 0.4,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+        },
+      })
+
+      // Update metrics every 30 seconds
+      setInterval(updateMetrics, 30000)
+
+      function updateMetrics() {
+        // Simulate real-time updates
+        const responseTime = Math.floor(Math.random() * 100) + 100
+        document.getElementById('response-time').textContent =
+          responseTime + 'ms'
+
+        const deployments = Math.floor(Math.random() * 5) + 20
+        document.getElementById('deployments').textContent = deployments
+
+        // Add new activity
+        const activities = [
+          '✅ Security scan completed',
+          '🔍 Code quality check passed',
+          '🧪 Integration tests passed',
+          '📊 Performance metrics updated',
+          '🚀 Deployment triggered',
+        ]
+
+        const randomActivity =
+          activities[Math.floor(Math.random() * activities.length)]
+        const activityLog = document.getElementById('activity-log')
+        const newActivity = document.createElement('p')
+        newActivity.textContent = `${randomActivity} - just now`
+        activityLog.insertBefore(newActivity, activityLog.firstChild)
+
+        // Keep only last 10 activities
+        while (activityLog.children.length > 10) {
+          activityLog.removeChild(activityLog.lastChild)
+        }
+      }
+    </script>
+  </body>
+</html>

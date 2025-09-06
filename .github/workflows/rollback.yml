@@ -1,0 +1,119 @@
+name: 🔄 Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to rollback to (e.g., v1.2.3 or commit SHA)'
+        required: true
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    name: 🚨 Emergency Rollback
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Validate rollback request
+        run: |
+          echo "🚨 ROLLBACK INITIATED"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Target Version: ${{ github.event.inputs.version }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+          echo "Initiated by: ${{ github.actor }}"
+          
+      - name: Checkout target version
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './cicd/package-lock.json'
+          
+      - name: Install dependencies
+        working-directory: './cicd'
+        run: npm ci
+        
+      - name: Build application
+        working-directory: './cicd'
+        run: npm run build
+        
+      - name: Deploy rollback version
+        uses: vercel/action@v1
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: './cicd'
+          vercel-args: ${{ github.event.inputs.environment == 'production' && '--prod' || '' }}
+          
+      - name: Verify rollback
+        run: |
+          # Wait for deployment to be ready
+          sleep 30
+          
+          # Health check
+          if [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+            curl -f "https://your-production-url.vercel.app" || exit 1
+          else
+            curl -f "https://your-staging-url.vercel.app" || exit 1
+          fi
+          
+          echo "✅ Rollback verified successfully"
+          
+      - name: Create rollback incident report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Emergency Rollback - ${{ github.event.inputs.environment }}`,
+              body: `
+              ## Rollback Details
+              
+              **Environment:** ${{ github.event.inputs.environment }}
+              **Rolled back to:** ${{ github.event.inputs.version }}
+              **Initiated by:** ${{ github.actor }}
+              **Timestamp:** ${new Date().toISOString()}
+              
+              ## Reason
+              ${{ github.event.inputs.reason }}
+              
+              ## Actions Required
+              - [ ] Investigate root cause
+              - [ ] Fix underlying issue
+              - [ ] Plan forward deployment
+              - [ ] Update monitoring alerts
+              
+              ## Rollback Verification
+              - [x] Deployment completed successfully
+              - [x] Health checks passed
+              - [ ] User impact assessment
+              - [ ] Performance metrics review
+              `,
+              labels: ['incident', 'rollback', 'urgent']
+            });
+            
+            console.log('Created incident report:', issue.data.html_url);
+            
+      - name: Send emergency notifications
+        run: |
+          echo "🚨 EMERGENCY ROLLBACK COMPLETED"
+          echo "Please check the incident report for next steps"

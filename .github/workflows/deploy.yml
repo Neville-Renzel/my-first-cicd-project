@@ -1,0 +1,160 @@
+# This is the name of our automation workflow
+name: Deploy to Vercel
+
+# This tells GitHub when to run our automation
+on:
+  # Run when someone pushes code to the main branch
+  push:
+    branches: [ main ]
+  # Run when someone creates a pull request to main branch
+  pull_request:
+    branches: [ main ]
+
+# These are the jobs (tasks) our automation will do
+jobs:
+  # Job 1: Check and test our code
+  test:
+    name: Run Tests and Linting
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+      # Step 1: Download our code
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      # Step 2: Set up Node.js (JavaScript environment)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      # Step 3: Install all the packages our app needs
+      - name: Install dependencies
+        run: npm ci
+        
+      # Step 4: Check if our code follows good practices
+      - name: Run ESLint (code quality check)
+        run: npm run lint
+        
+      # Step 5: Try to build our app to catch any errors
+      - name: Build application
+        run: npm run build
+
+      - name: Debug environment
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Files: $(ls -la)"
+          echo "Node version: $(node --version)"
+      - name: Build app
+        id: build
+        run: npm run build
+  
+      # Step 6: Check build output
+      - name: Check build output
+        run: echo "Build completed successfully"
+        
+      # Step 7: Run tests
+      - name: Run tests
+        run: npm test
+        
+  # Job 2: Deploy to Vercel (only if tests pass)
+  deploy:
+    name: Deploy to Vercel
+    needs: test  # This means: only run if the test job succeeds
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'  # Only deploy from main branch
+    
+    steps:
+      # Step 1: Download our code
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      # Step 2: Deploy to Vercel using their official action
+      - name: Deploy to production
+        if: github.ref == 'refs/heads/main'
+        uses: vercel/action@v1
+        with:
+          # These are secret keys that let GitHub talk to Vercel
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          # Deploy to production
+          vercel-args: '--prod'
+          
+      # Step 3: Notify deployment status
+      - name: Notify deployment status
+      - name: Run on success
+        if: success()
+        run: echo "Previous steps succeeded"
+
+      - name: Run on failure
+        if: failure()
+        run: echo "Something failed"
+
+      - name: Always run
+        if: always()
+        run: cleanup.sh
+
+      - name: Update commit status
+        uses: ouzi-dev/commit-status-updater@v2
+        with:
+          status: "success"
+          description: "Deployment completed successfully"
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # Add this job after build-and-performance
+  performance-testing:
+    name: 🏃‍♂️ Performance Testing
+    needs: [build-and-performance]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIRECTORY }}/package-lock.json
+          
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: npm ci
+        
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+          
+      - name: Start application for load testing
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          npm run build
+          npm start &
+          sleep 10
+          
+      - name: Run load tests
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          k6 run --out json=load-test-results.json tests/load/load-test.js
+          
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-test-results
+          path: ${{ env.WORKING_DIRECTORY }}/load-test-results.json
